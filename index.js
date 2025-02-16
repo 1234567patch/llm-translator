@@ -113,18 +113,18 @@ function loadSettings() {
 
     // 현재 공급자의 마지막 사용 모델 불러오기
     updateModelList();
-    
+
     // 프리필 사용 여부 및 내용 로드
     $('#llm_prefill_toggle').prop('checked', extensionSettings.llm_prefill_toggle);
-    $('#llm_prefill_content').val(extensionSettings.llm_prefill_content);    
-    
+    $('#llm_prefill_content').val(extensionSettings.llm_prefill_content);
+
     // 스로틀링 딜레이 값
     $('#throttle_delay').val(extensionSettings.throttle_delay || '0');
 
     // 체크박스 상태 설정 및 버튼 업데이트
     $('#llm_translation_button_toggle').prop('checked', extensionSettings.show_input_translate_button);
     updateInputTranslateButton();
-    
+
     // 리버스 프록시 설정 로드
     $('#llm_use_reverse_proxy').prop('checked', extensionSettings.use_reverse_proxy);
     $('#llm_reverse_proxy_url').val(extensionSettings.reverse_proxy_url);
@@ -151,15 +151,15 @@ function updateParameterVisibility(provider) {
 function loadParameterValues(provider) {
     const params = extensionSettings.parameters[provider];
     if (!params) return;
-    
+
     // 모든 파라미터 입력 필드 초기화
     $(`.${provider}_params input`).each(function() {
         const input = $(this);
         const paramName = input.attr('id').replace(`_${provider}`, '');
-        
+
         if (params.hasOwnProperty(paramName)) {
             const value = params[paramName];
-            
+
             // 슬라이더, 입력 필드 모두 업데이트
             if (input.hasClass('neo-range-slider')) {
                 input.val(value);
@@ -170,7 +170,7 @@ function loadParameterValues(provider) {
             }
         }
     });
-    
+
     // 공통 파라미터 업데이트
     ['max_length', 'temperature'].forEach(param => {
         if (params.hasOwnProperty(param)) {
@@ -187,17 +187,17 @@ function loadParameterValues(provider) {
 // 선택된 공급자의 파라미터 값을 저장
 function saveParameterValues(provider) {
     const params = {...extensionSettings.parameters[provider]};
-    
+
     // 공통 파라미터 저장
     params.max_length = parseInt($('#max_length').val());
     params.temperature = parseFloat($('#temperature').val());
-    
+
     // 공급자별 파라미터 저장
     $(`.${provider}_params input.neo-range-input`).each(function() {
         const paramName = $(this).attr('id').replace(`_${provider}`, '');
         params[paramName] = parseFloat($(this).val());
     });
-    
+
     extensionSettings.parameters[provider] = params;
     saveSettingsDebounced();
 }
@@ -296,7 +296,12 @@ function updateModelList() {
             'gemini-1.5-flash-latest',
             'gemini-1.5-flash',
             'gemini-1.5-flash-001',
-            'gemini-1.5-flash-002'
+            'gemini-1.5-flash-002',
+            'gemini-2.0-pro-exp',
+            'gemini-2.0-pro-exp-02-05',
+            'gemini-2.0-flash-exp',
+            'gemini-2.0-flash-lite-preview',
+            'gemini-2.0-flash-lite-preview-02-05'
         ],
         'cohere': [
             'command-r7b-12-2024',
@@ -317,11 +322,11 @@ function updateModelList() {
     // 해당 공급자의 마지막 사용 모델을 선택
     const lastUsedModel = extensionSettings.provider_model_history[provider] || providerModels[0];
     modelSelect.val(lastUsedModel);
-    
+
     // 모델과 공급자 이력 업데이트
     extensionSettings.llm_model = lastUsedModel;
     extensionSettings.provider_model_history[provider] = lastUsedModel;
-    
+
     saveSettingsDebounced();
 }
 
@@ -338,7 +343,7 @@ async function llmTranslate(text, prompt) {
 
     // 사용자 메시지 추가
     messages.push({ role: 'user', content: fullPrompt });
-    
+
     // 프리필 사용 시 메세지 포맷
     if (extensionSettings.llm_prefill_toggle) {
         const prefillContent = extensionSettings.llm_prefill_content || 'Understood. Executing the translation as instructed. Here is my response:';
@@ -381,12 +386,36 @@ async function llmTranslate(text, prompt) {
         case 'google':
             apiKey = secret_state[SECRET_KEYS.MAKERSUITE];
             parameters.chat_completion_source = 'makersuite';
+
+            // Safety Settings for Google models
+            let safetySettings = Object.values({
+                HARM_CATEGORY_HARASSMENT: 'HARM_CATEGORY_HARASSMENT',
+                HARM_CATEGORY_HATE_SPEECH: 'HARM_CATEGORY_HATE_SPEECH',
+                HARM_CATEGORY_SEXUALLY_EXPLICIT: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+                HARM_CATEGORY_DANGEROUS_CONTENT: 'HARM_CATEGORY_DANGEROUS_CONTENT'
+            }).map(category => ({
+                category: category,
+                threshold: 'BLOCK_NONE', // Default to BLOCK_NONE
+            }));
+
+            // Adjust threshold for flash models
+            const flashModels = [
+                'gemini-2.0-flash',
+                'gemini-2.0-flash-001',
+                'gemini-2.0-flash-exp',
+                'gemini-2.0-flash-lite-preview',
+                'gemini-2.0-flash-lite-preview-02-05'
+            ];
+            if (flashModels.includes(model)) {
+                safetySettings = safetySettings.map(setting => ({ ...setting, threshold: 'OFF' }));
+            }
+            parameters.safetySettings = safetySettings;
             break;
         case 'cohere':
             apiKey = secret_state[SECRET_KEYS.COHERE];
             parameters.chat_completion_source = 'cohere';
             break;
-            
+
         default:
             throw new Error('지원되지 않는 공급자입니다.');
     }
@@ -485,7 +514,7 @@ async function translateMessage(messageId, forceTranslate = false) {
     }
 }
 
-// 원문과 번역문 토글 
+// 원문과 번역문 토글
 async function toggleOriginalText(messageId) {
     const context = getContext();
     const message = context.chat[messageId];
@@ -799,7 +828,7 @@ jQuery(async () => {
 
     // html 완전 로드 후 설정 불러오기
     await new Promise(resolve => setTimeout(resolve, 100));
-    
+
     loadSettings();
     initializeEventHandlers();
 });
@@ -862,7 +891,7 @@ function initializeEventHandlers() {
         saveSettingsDebounced();
         updateInputTranslateButton();
     });
-    
+
     // 프리필 사용 체크박스 이벤트 핸들러
     $('#llm_prefill_toggle').off('change').on('change', function() {
         extensionSettings.llm_prefill_toggle = $(this).is(':checked');
@@ -874,7 +903,7 @@ function initializeEventHandlers() {
         extensionSettings.llm_prefill_content = $(this).val();
         saveSettingsDebounced();
     });
-    
+
     // 이벤트 소스에 이벤트 핸들러 등록
     eventSource.makeFirst(event_types.CHARACTER_MESSAGE_RENDERED, function({ messageId }) {
         translateMessage(messageId);
@@ -930,13 +959,13 @@ function initializeEventHandlers() {
     eventSource.on(event_types.CHAT_CHANGED, function() {
         setTimeout(addButtonsToExistingMessages,100);
     });
-    
+
     // 스로틀링 딜레이 입력 이벤트 핸들러
     $('#throttle_delay').off('input change').on('input change', function() {
         extensionSettings.throttle_delay = $(this).val();
         saveSettingsDebounced();
     });
-    
+
     // 리버스 프록시 사용 체크박스 이벤트 핸들러
     $('#llm_use_reverse_proxy').off('change').on('change', function() {
         saveReverseProxySettings();
@@ -958,5 +987,5 @@ function initializeEventHandlers() {
         const type = passwordInput.attr('type') === 'password' ? 'text' : 'password';
         passwordInput.attr('type', type);
         $(this).toggleClass('fa-eye-slash fa-eye');
-    });    
+    });
 }
