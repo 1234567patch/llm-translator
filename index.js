@@ -387,15 +387,17 @@ async function llmTranslate(text, prompt) {
             apiKey = secret_state[SECRET_KEYS.MAKERSUITE];
             parameters.chat_completion_source = 'makersuite';
 
+            
             // Safety Settings for Google models
             let safetySettings = Object.values({
                 HARM_CATEGORY_HARASSMENT: 'HARM_CATEGORY_HARASSMENT',
                 HARM_CATEGORY_HATE_SPEECH: 'HARM_CATEGORY_HATE_SPEECH',
                 HARM_CATEGORY_SEXUALLY_EXPLICIT: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-                HARM_CATEGORY_DANGEROUS_CONTENT: 'HARM_CATEGORY_DANGEROUS_CONTENT'
+                HARM_CATEGORY_DANGEROUS_CONTENT: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+                HARM_CATEGORY_CIVIC_INTEGRITY: 'HARM_CATEGORY_CIVIC_INTEGRITY'
             }).map(category => ({
                 category: category,
-                threshold: 'BLOCK_NONE', // Default to BLOCK_NONE
+                threshold: 'OFF', // Default to BLOCK_NONE
             }));
 
             // Adjust threshold for flash models
