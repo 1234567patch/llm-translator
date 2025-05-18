@@ -283,6 +283,7 @@ function updateModelList() {
         ],
         'google': [
             'gemini-2.0-flash-thinking-exp',
+            'gemini-2.5-pro-preview-05-06',
             'gemini-2.0-flash-exp',
             'gemini-exp-1206',
             'gemini-exp-1121',
